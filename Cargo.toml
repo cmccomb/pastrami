@@ -1,9 +1,0 @@
-[package]
-name = "pastrami"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rhai = "1.8.0"
-rhai-sci = "0.1.6"
-rhai-rand = "0.1.4"
