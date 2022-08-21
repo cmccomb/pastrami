@@ -35,8 +35,8 @@
               </script>
             </wc-codemirror>
           </div>
-          <div class="col-5 h-100"  style="background-color: #2B2B2B; overflow-y:auto">
-            <code id="output" class="w-100 h-100" style="color: #fff; display: block;  white-space: pre-wrap">Welcome to pastrami on rhai!</code>
+          <div class="col-5 h-100" id="output_holder" style="background-color: #2B2B2B; overflow-y:auto">
+            <code id="output" class="w-100 h-100" style="color: #fff; display: block;  white-space: pre-wrap"></code>
           </div>
       </div>
 <!--      </div>-->
@@ -44,6 +44,9 @@
     <script>
       // access the pre-bundled global API functions
       const invoke = window.__TAURI__.invoke
+
+      toggle_spinner();
+      append_output('Welcome to pastrami on rhai!');
 
       // now we can call our Command!
       // Right-click the application background and open the developer tools.
@@ -56,7 +59,10 @@
       function append_output(s) {
         var now = new Date();
         var snow = now.toUTCString();
-        document.getElementById("output").textContent = document.getElementById("output").textContent + '\n\n[ ' + snow + ' ]\n' + s;
+        var op = document.getElementById("output");
+        var oph = document.getElementById("output_holder");
+        op.textContent = op.textContent + '[ ' + snow + ' ]\n' + s + '\n\n';
+        oph.scroll({ top: oph.scrollHeight, behavior: "smooth"});
         toggle_spinner();
       }
 
