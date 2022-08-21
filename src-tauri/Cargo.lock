@@ -87,6 +87,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "rhai",
+ "rhai-rand",
  "rhai-sci",
  "serde",
  "serde_json",
@@ -2906,6 +2907,16 @@ dependencies = [
  "rhai_codegen",
  "smallvec",
  "smartstring",
+]
+
+[[package]]
+name = "rhai-rand"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f74fe74ca6741a852884d9212f35405b1d30b412cc5fec8c59bad35bd692b862"
+dependencies = [
+ "rand 0.8.5",
+ "rhai",
 ]
 
 [[package]]
