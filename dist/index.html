@@ -1,50 +1,57 @@
 <!DOCTYPE html>
 <html>
-  <style>
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-    }
+  <head>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
 
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-  </style>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-  <body>
-  <div class="container-fluid h-100 p-3">
-    <ul class="nav nav-tabs justify-content-center" id="myTab" role="tablist">
-      <li class="nav-item">
-        <a class="nav-link active" id="script-tab" data-toggle="tab" href="#scripting" role="tab" aria-controls="script" aria-selected="true">Script Mode</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="repl-tab" data-toggle="tab" href="#repling" role="tab" aria-controls="reply" aria-selected="false">REPL Mode</a>
-      </li>
-    </ul>
-    <div class="tab-content" id="myTabContent">
-      <div class="tab-pane fade show active" id="scripting" role="tabpanel" aria-labelledby="script-tab">
-        <div class="row">
-          <div class="col-3">Directory</div>
-          <div class="col">Script</div>
-          <div class="col-3">Output</div>
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+    <script type="module" src="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/index.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/mode/javascript/javascript.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  </head>
+  <body class="bg-light">
+    <div class="container-fluid row p-3 vh-100">
+      <div class="col h-100">
+        <div class="btn-group mb-3" role="group" aria-label="Basic example">
+          <button type="button" class="btn btn-success" onclick="run_script()">Run</button>
         </div>
-      </div>
-      <div class="tab-pane fade" id="repling" role="tabpanel" aria-labelledby="label-tab">
-        <div class="row">
-          <div class="col-3">Directory</div>
-          <div class="col">REPL</div>
-          <div class="col-3">Variables</div>
-        </div>
+        <div class="row w-100 h-75">
+          <div class="col h-100">
+            <wc-codemirror mode="javascript" theme="darcula" id="script" class="w-100 h-100"  style="background-color: #2B2B2B">
+              <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/theme/darcula.css">
+              <script type="wc-content">
+                // Load data
+                let url = "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv";
+                let x = read_matrix(url).transpose();
 
+                // Massage data
+                let L = x.len;
+                let y = x.drain(|v, i| i == (L-1));
+                let x = ones(1, size(x)[1]) + x;
+
+                // Do regression and report
+                let b = regress(x.transpose(), y.transpose());
+                b
+              </script>
+            </wc-codemirror>
+          </div>
+          <div class="col-4 h-100" style="background-color:#000; color: #fff">
+            <code id="output" class="w-100 h-100" style="color: #fff"></code>
+          </div>
       </div>
-      <div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="contact-tab">...</div>
     </div>
-  </div>
+    </div>
     <script>
       // access the pre-bundled global API functions
       const invoke = window.__TAURI__.invoke
@@ -52,9 +59,10 @@
       // now we can call our Command!
       // Right-click the application background and open the developer tools.
       // You will see "Hello, World!" printed in the console!
-      invoke('greet', { name: 'World' })
-              // `invoke` returns a Promise
-              .then((response) => console.log(response))
+      function run_script() {
+        invoke('greet', { name: document.getElementById("script").value })
+                .then((response) => document.getElementById("output").textContent = response)
+      }
     </script>
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>

@@ -10,7 +10,19 @@ fn main() {
         .expect("error while running tauri application");
 }
 
+use rhai::{packages::Package, Engine};
+use rhai_sci::SciPackage;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}!", name)
+    let mut engine = rhai::Engine::new();
+    engine.register_global_module(SciPackage::new().as_shared_module());
+    let script_ast = engine.compile(&name).map_err(|e| e.to_string()).unwrap();
+
+    let result: rhai::Dynamic = engine
+        .eval_ast(&script_ast)
+        .map_err(|e| e.to_string())
+        .unwrap();
+
+    format!("{:?}", result)
 }
