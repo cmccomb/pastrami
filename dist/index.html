@@ -10,7 +10,10 @@
         <div class="row w-100 h-100 ml-0">
           <div class="col-1 h-100 px-0">
             <div class="btn-group w-100" role="group" aria-label="Basic example">
-              <button type="button" class="btn btn-success" onclick="run_script()">Run</button>
+              <button id="actualbutton" type="button" class="btn btn-success" onclick="run_script()">
+                <span id="buttonspinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none"></span>
+                <span id="buttontext" class="">Run</span>
+              </button>
             </div>
           </div>
           <div class="col-8 mh-100">
@@ -46,13 +49,25 @@
       // Right-click the application background and open the developer tools.
       // You will see "Hello, World!" printed in the console!
       function run_script() {
-        invoke('greet', { name: document.getElementById("script").value })
-                .then((response) => document.getElementById("output").textContent = response)
+        toggle_spinner();
+        invoke('rhai', { name: document.getElementById("script").value })
+                .then((response) => {toggle_spinner(); document.getElementById("output").textContent = response})
       }
 
-      // function run_line() {
-      //   invoke()
-      // }
+      function toggle_spinner() {
+        var x = document.getElementById("buttonspinner");
+        var y = document.getElementById("buttontext");
+        var z = document.getElementById("actualbutton");
+        if (x.style.display === "none") {
+          x.style.display = "inline-block";
+          y.style.display = "none";
+          z.disabled = true;
+        } else {
+          x.style.display = "none";
+          y.style.display = "inline-block";
+          z.disabled = false;
+        }
+      }
     </script>
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>

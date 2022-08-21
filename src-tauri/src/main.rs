@@ -2,10 +2,17 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+use tauri::Manager;
+
+// the payload type must implement `Serialize` and `Clone`.
+#[derive(Clone, serde::Serialize)]
+struct Payload {
+    message: String,
+}
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![rhai])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -15,7 +22,7 @@ use rhai_rand::RandomPackage;
 use rhai_sci::SciPackage;
 
 #[tauri::command]
-fn greet(name: &str) -> String {
+fn rhai(name: &str) -> String {
     let mut engine = rhai::Engine::new();
     engine.register_global_module(SciPackage::new().as_shared_module());
     engine.register_global_module(RandomPackage::new().as_shared_module());
