@@ -16,7 +16,7 @@
               </button>
             </div>
           </div>
-          <div class="col-8 mh-100">
+          <div class="col-6 mh-100">
             <wc-codemirror mode="javascript" theme="darcula" id="script" class="w-100 h-100" style="background-color: #2B2B2B; overflow-y:auto">
               <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/theme/darcula.css">
               <script type="wc-content">
@@ -35,8 +35,8 @@
               </script>
             </wc-codemirror>
           </div>
-          <div class="col-3 h-100"  style="background-color: #2B2B2B; overflow-y:auto">
-            <code id="output" class="w-100 h-100" style="color: #fff">Welcome to pastrami on rhai!</code>
+          <div class="col-5 h-100"  style="background-color: #2B2B2B; overflow-y:auto">
+            <code id="output" class="w-100 h-100" style="color: #fff; display: block;  white-space: pre-wrap">Welcome to pastrami on rhai!</code>
           </div>
       </div>
 <!--      </div>-->
@@ -50,8 +50,14 @@
       // You will see "Hello, World!" printed in the console!
       function run_script() {
         toggle_spinner();
-        invoke('rhai', { name: document.getElementById("script").value })
-                .then((response) => {toggle_spinner(); document.getElementById("output").textContent = response})
+        invoke('rhai', { name: document.getElementById("script").value });
+      }
+
+      function append_output(s) {
+        var now = new Date();
+        var snow = now.toUTCString();
+        document.getElementById("output").textContent = document.getElementById("output").textContent + '\n\n[ ' + snow + ' ]\n' + s;
+        toggle_spinner();
       }
 
       function toggle_spinner() {
