@@ -20,7 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.0.5", features = ["api-all"] }
 rhai-sci = {version = "0.1.7", features = ["smartcore", "nalgebra", "rand", "io"], path="/Users/mccomb/CLionProjects/rhai-sci"}
 rhai-rand = "0.1.4"
-rhai = "1.8.0"
+rhai = { version = "1.8.0", features= ["sync"] }
 
 [features]
 # by default Tauri runs in production mode

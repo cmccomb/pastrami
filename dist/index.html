@@ -4,6 +4,8 @@
     <script type="module" src="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/index.js"></script>
     <script type="module" src="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/mode/javascript/javascript.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <style>
+    </style>
   </head>
   <body style="background-color: black">
     <div class="container-fluid p-3 vh-100">
@@ -17,7 +19,7 @@
             </div>
           </div>
           <div class="col-6 mh-100">
-            <wc-codemirror mode="javascript" theme="darcula" id="script" class="w-100 h-100" style="background-color: #2B2B2B; overflow-y:auto">
+            <wc-codemirror mode="javascript" theme="darcula" id="script" class="w-100 h-100" style="background-color: #2B2B2B; overflow-y:auto; overflow-x: auto; font-size: 87.5%">
               <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/vanillawc/wc-codemirror/theme/darcula.css">
               <script type="wc-content">
                 // Load data
@@ -48,15 +50,23 @@
       toggle_spinner();
       append_output('Welcome to pastrami on rhai!');
 
-      // now we can call our Command!
-      // Right-click the application background and open the developer tools.
-      // You will see "Hello, World!" printed in the console!
       function run_script() {
         toggle_spinner();
         invoke('rhai', { name: document.getElementById("script").value });
       }
 
       function append_output(s) {
+       if(s.charAt(0) === '#')
+        {
+          s = s.substring(1);
+        }
+
+        try {
+          let inter = JSON.parse(s);
+          s = JSON.stringify(inter, null, 4);
+        } catch {
+          console.log("oops!");
+        }
         var now = new Date();
         var snow = now.toUTCString();
         var op = document.getElementById("output");

@@ -56,11 +56,11 @@
     },
     "windows": [
       {
-        "fullscreen": true,
-        "height": 600,
+        "fullscreen": false,
+        "height": 1200,
         "resizable": true,
         "title": "pastrami on rhai",
-        "width": 800
+        "width": 1600
       }
     ]
   }
