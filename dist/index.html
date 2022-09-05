@@ -10,30 +10,35 @@
         [contenteditable] {
             outline: 0 solid transparent;
         }
-
-        [contenteditable]:before {
-            content: '>>> ';
-        }
-    </style>
+NEW     </style>
 </head>
 <body style="background-color: black">
-<div class="container-fluid p-3 vh-100">
-    <div class="row w-100 h-100 ml-0">
-        <div class="col h-100" id="output_holder" style="background-color: #2B2B2B;">
-            <code id="output" class="w-100 text-warning d-block"
-                  style="height: calc(100% - 2em); white-space: pre-wrap; overflow-y:auto"></code>
-            <code id="repl_input" class="w-100 text-warning d-block"
-                  style="height: 1em; display: block;  white-space: pre-wrap" contenteditable></code>
+<div class="container-fluid h-100 min-vh-100 p-0">
+    <div class="row w-100 m-0" id="output_holder" >
+        <div class="col h-100 min-vh-100 "style="background-color: #2B2B2B;">
+            <code id="output" class="text-warning w-100 pt-3 d-table-cell"
+                  style="white-space: pre-wrap; overflow-y:auto;">asdfasdf</code>
+            <code id="prompt_placeholder" class="text-warning d-inline"
+                  style="white-space: pre-wrap; width: 3em">&gt;&gt;&gt; </code>
+            <code id="repl_input" class="text-warning d-inline pb-0 w-100"
+                  style="min-height: 1em; white-space: pre-wrap; min-width: 3em" contenteditable></code>
         </div>
     </div>
 </div>
 <script>
+
+    document.getElementById("repl_input").focus();
+
     // access the pre-bundled global API functions
     const invoke = window.__TAURI__.invoke;
     document.body.setAttribute('spellcheck', false);
 
     document.getElementById("repl_input").addEventListener("keydown", function (e) {
-        if (e.code === "Enter") {
+        if (e.code === "Enter" && e.shiftKey) {
+            e.preventDefault();
+            document.getElementById("repl_input").innerText += "\n";
+            PosEnd(document.getElementById("repl_input"));
+        } else if (e.code === "Enter") {
             e.preventDefault();
             let script = document.getElementById("repl_input").textContent;
             document.getElementById("repl_input").innerText = "";
@@ -42,9 +47,26 @@
         }
     });
 
+    function PosEnd(end) {
+        var len = end.value.length;
+
+        // Mostly for Web Browsers
+        if (end.setSelectionRange) {
+            end.focus();
+            end.setSelectionRange(len, len);
+        } else if (end.createTextRange) {
+            var t = end.createTextRange();
+            t.collapse(true);
+            t.moveEnd('character', len);
+            t.moveStart('character', len);
+            t.select();
+        }
+    }
+
     function append_output(s) {
-        let op = document.getElementById("output");
         if (s.length > 0) {
+
+            let op = document.getElementById("output");
             if (s.charAt(0) === '#') {
                 s = s.substring(1);
             }
@@ -58,7 +80,9 @@
             }
             op.textContent = op.textContent + s + '\n';
         }
-        op.scroll({top: op.scrollHeight, behavior: "smooth"});
+
+        let oph = document.getElementById("output_holder");
+        oph.scroll({top: oph.scrollHeight, behavior: "smooth"});
     }
 </script>
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
