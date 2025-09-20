@@ -3,7 +3,6 @@
     windows_subsystem = "windows"
 )]
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
 
 /// Builds a JavaScript snippet that safely forwards a message to the frontend.
 ///
@@ -37,7 +36,7 @@ struct MyState(Mutex<rhai::Engine>, Mutex<rhai::Scope<'static>>);
 
 fn main() {
     let mut engine = rhai::Engine::new();
-    let mut scope = rhai::Scope::new();
+    let scope = rhai::Scope::new();
     engine.register_global_module(SciPackage::new().as_shared_module());
 
     tauri::Builder::default()
@@ -56,31 +55,52 @@ fn rhai_script(script: &str, window: tauri::Window) {
         send_output(&window, &message);
     });
 
-    run_rhai_script_with_sink(script, output_sink);
+    run_rhai_script_with_sink(script, &output_sink);
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn rhai_repl(script: &str, window: tauri::Window, state: tauri::State<MyState>) {
     let mut engine = state.0.lock().unwrap();
     let mut scope = state.1.lock().unwrap();
-    let w = window.clone();
-    engine.on_print(move |x| {
-        send_output(&w, &x.to_string());
+    let window_for_print = window.clone();
+    engine.on_print(move |message| {
+        send_output(&window_for_print, message);
     });
 
-    match engine.eval_with_scope::<rhai::Dynamic>(&mut scope, &script) {
+    match engine.eval_with_scope::<rhai::Dynamic>(&mut scope, script) {
         Ok(result) => send_output(&window, &result.to_string()),
         Err(e) => send_output(&window, &format!("{e:?}")),
-    };
+    }
 }
 
 type OutputSink = Arc<dyn Fn(String) + Send + Sync + 'static>;
 
-fn run_rhai_script_with_sink(script: &str, sink: OutputSink) {
+/// Executes a Rhai script and forwards every emitted message to the provided
+/// sink.
+///
+/// Messages include anything produced by the script via `print` as well as the
+/// final return value or runtime error.
+///
+/// # Examples
+/// ```rust,ignore
+/// let output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+/// let sink_output = std::sync::Arc::clone(&output);
+/// let sink: OutputSink = std::sync::Arc::new(move |message: String| {
+///     sink_output
+///         .lock()
+///         .expect("failed to capture script output")
+///         .push(message);
+/// });
+///
+/// run_rhai_script_with_sink("40 + 2", &sink);
+/// assert_eq!(output.lock().unwrap().as_slice(), ["42"]);
+/// ```
+fn run_rhai_script_with_sink(script: &str, sink: &OutputSink) {
     let mut engine = rhai::Engine::new();
     engine.register_global_module(SciPackage::new().as_shared_module());
 
-    let print_sink = sink.clone();
+    let print_sink = Arc::clone(sink);
     engine.on_print(move |x| {
         print_sink(x.to_string());
     });
@@ -96,50 +116,91 @@ fn run_rhai_script_with_sink(script: &str, sink: OutputSink) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{append_output_script, run_rhai_script_with_sink, OutputSink};
+    use std::sync::{Arc, Mutex};
+
+    fn run_script_with_collector(script: &str) -> Vec<String> {
+        let captured_output: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let sink_target = Arc::clone(&captured_output);
+        let sink: OutputSink = Arc::new(move |message: String| {
+            sink_target
+                .lock()
+                .expect("collector mutex poisoned")
+                .push(message);
+        });
+
+        run_rhai_script_with_sink(script, &sink);
+
+        let collected = captured_output
+            .lock()
+            .expect("collector mutex poisoned")
+            .clone();
+
+        collected
+    }
 
     #[test]
     fn append_output_script_serializes_control_characters() {
-        let result = append_output_script("Line 1\nLine 2\tTabbed").unwrap();
+        let result = append_output_script("Line 1\nLine 2\tTabbed")
+            .expect("failed to serialize message with control characters");
         assert_eq!(result, "append_output(\"Line 1\\nLine 2\\tTabbed\")");
     }
 
     #[test]
     fn append_output_script_preserves_quotes_and_unicode() {
-        let result = append_output_script("He said, \"hi\" ☃").unwrap();
+        let result = append_output_script("He said, \"hi\" ☃")
+            .expect("failed to serialize message with quotes and unicode");
         assert_eq!(result, "append_output(\"He said, \\\"hi\\\" ☃\")");
     }
 
     #[test]
-    fn invalid_script_reports_error_without_panicking() {
-        let captured_output: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-        let sink_target = captured_output.clone();
-        let sink: OutputSink = Arc::new(move |message: String| {
-            sink_target.lock().unwrap().push(message);
-        });
+    fn invalid_script_reports_parse_error() {
+        let output = run_script_with_collector("let x = ;");
+        let last_message = output
+            .last()
+            .expect("missing output entry for invalid script");
 
-        run_rhai_script_with_sink("let x = ;", sink);
-
-        let output = captured_output.lock().unwrap();
-        assert!(!output.is_empty(), "no output captured from invalid script");
-        let last = output.last().expect("missing output entry");
         assert!(
-            last.to_lowercase().contains("error"),
-            "expected error message, got: {last}"
+            last_message.contains("Unexpected"),
+            "expected parse error message, got: {last_message}",
         );
     }
 
     #[test]
     fn valid_script_reports_result() {
-        let captured_output: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-        let sink_target = captured_output.clone();
-        let sink: OutputSink = Arc::new(move |message: String| {
-            sink_target.lock().unwrap().push(message);
-        });
+        let output = run_script_with_collector("40 + 2");
+        assert!(
+            output.contains(&"42".to_string()),
+            "expected valid script to produce \"42\" but saw {output:?}",
+        );
+    }
 
-        run_rhai_script_with_sink("40 + 2", sink);
+    #[test]
+    fn runtime_errors_are_forwarded_to_the_sink() {
+        let output = run_script_with_collector(
+            r#"
+            fn explode() { throw("boom"); }
+            explode();
+            "#,
+        );
 
-        let output = captured_output.lock().unwrap();
-        assert!(output.contains(&"42".to_string()));
+        let last_message = output
+            .last()
+            .expect("missing output entry for runtime error");
+        assert!(
+            last_message.contains("boom"),
+            "expected runtime error payload, got: {last_message}",
+        );
+    }
+
+    #[test]
+    fn print_statements_are_captured_before_results() {
+        let output = run_script_with_collector(r#"print("hi"); 41 + 1;"#);
+
+        assert_eq!(
+            output,
+            vec!["hi".to_string(), "42".to_string()],
+            "expected print output to precede the result"
+        );
     }
 }
