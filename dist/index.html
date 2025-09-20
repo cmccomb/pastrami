@@ -63,25 +63,32 @@
         }
     }
 
-    function append_output(s) {
-        if (s.length > 0) {
+    function append_output(payload) {
+        let message;
 
-            let op = document.getElementById("output");
-            if (s.charAt(0) === '#') {
-                s = s.substring(1);
-            }
-
+        if (typeof payload === "string") {
+            message = payload;
+        } else if (payload === null || payload === undefined) {
+            message = "";
+        } else {
             try {
-                let inter = JSON.parse(s);
-                s = JSON.stringify(inter, null, 4);
-            } catch {
-                console.log("oops!");
-                console.log(s);
+                message = JSON.stringify(payload, null, 4);
+            } catch (error) {
+                console.error("Failed to stringify output payload", error);
+                message = String(payload);
             }
-            op.textContent = op.textContent + s + '\n';
         }
 
-        let oph = document.getElementById("output_holder");
+        if (message.length > 0 && message.charAt(0) === '#') {
+            message = message.substring(1);
+        }
+
+        if (message.length > 0) {
+            const op = document.getElementById("output");
+            op.textContent = op.textContent + message + '\n';
+        }
+
+        const oph = document.getElementById("output_holder");
         oph.scroll({top: oph.scrollHeight, behavior: "smooth"});
     }
 </script>

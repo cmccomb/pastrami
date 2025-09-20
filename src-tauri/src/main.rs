@@ -5,6 +5,34 @@
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
+/// Builds a JavaScript snippet that safely forwards a message to the frontend.
+///
+/// The message is serialized using `serde_json` so that newline characters,
+/// quotes, and other special characters remain valid once evaluated in the
+/// webview.
+///
+/// # Examples
+/// ```rust,ignore
+/// let script = append_output_script("Hello\nworld").unwrap();
+/// assert_eq!(script, "append_output(\"Hello\\nworld\")");
+/// ```
+fn append_output_script(message: &str) -> Result<String, serde_json::Error> {
+    serde_json::to_string(message).map(|escaped| format!("append_output({escaped})"))
+}
+
+fn send_output(window: &tauri::Window, message: &str) {
+    match append_output_script(message) {
+        Ok(script) => {
+            if let Err(eval_error) = window.eval(&script) {
+                eprintln!("failed to evaluate output script: {eval_error}");
+            }
+        }
+        Err(serialize_error) => {
+            eprintln!("failed to serialize output message {message:?}: {serialize_error}");
+        }
+    }
+}
+
 struct MyState(Mutex<rhai::Engine>, Mutex<rhai::Scope<'static>>);
 
 fn main() {
@@ -25,8 +53,7 @@ use rhai_sci::SciPackage;
 #[tauri::command]
 fn rhai_script(script: &str, window: tauri::Window) {
     let output_sink: OutputSink = Arc::new(move |message: String| {
-        let script = format!("append_output('{}')", message);
-        let _ = window.eval(&script);
+        send_output(&window, &message);
     });
 
     run_rhai_script_with_sink(script, output_sink);
@@ -38,12 +65,12 @@ fn rhai_repl(script: &str, window: tauri::Window, state: tauri::State<MyState>) 
     let mut scope = state.1.lock().unwrap();
     let w = window.clone();
     engine.on_print(move |x| {
-        w.eval(&format!("append_output('{}')", x.to_string()));
+        send_output(&w, &x.to_string());
     });
 
     match engine.eval_with_scope::<rhai::Dynamic>(&mut scope, &script) {
-        Ok(result) => window.eval(&format!("append_output('{}')", result.to_string())),
-        Err(e) => window.eval(&format!("append_output('{:?}')", e)),
+        Ok(result) => send_output(&window, &result.to_string()),
+        Err(e) => send_output(&window, &format!("{e:?}")),
     };
 }
 
@@ -70,6 +97,18 @@ fn run_rhai_script_with_sink(script: &str, sink: OutputSink) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn append_output_script_serializes_control_characters() {
+        let result = append_output_script("Line 1\nLine 2\tTabbed").unwrap();
+        assert_eq!(result, "append_output(\"Line 1\\nLine 2\\tTabbed\")");
+    }
+
+    #[test]
+    fn append_output_script_preserves_quotes_and_unicode() {
+        let result = append_output_script("He said, \"hi\" ☃").unwrap();
+        assert_eq!(result, "append_output(\"He said, \\\"hi\\\" ☃\")");
+    }
 
     #[test]
     fn invalid_script_reports_error_without_panicking() {
