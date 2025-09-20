@@ -1,0 +1,19 @@
+[package]
+name = "rhai-sci"
+version = "0.1.7"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "rhai_sci"
+path = "src/lib.rs"
+
+[features]
+default = []
+smartcore = []
+nalgebra = []
+rand = []
+io = []
+
+[dependencies]
+rhai = { version = "1.9.0", features = ["sync"] }
