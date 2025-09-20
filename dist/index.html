@@ -48,18 +48,45 @@
     });
 
     function PosEnd(end) {
-        var len = end.value.length;
+        if (!end) {
+            return;
+        }
 
-        // Mostly for Web Browsers
-        if (end.setSelectionRange) {
+        const textLength = (typeof end.textContent === "string")
+            ? end.textContent.length
+            : (typeof end.value === "string" ? end.value.length : 0);
+
+        if (typeof end.setSelectionRange === "function" && typeof end.value === "string") {
             end.focus();
-            end.setSelectionRange(len, len);
-        } else if (end.createTextRange) {
-            var t = end.createTextRange();
-            t.collapse(true);
-            t.moveEnd('character', len);
-            t.moveStart('character', len);
-            t.select();
+            end.setSelectionRange(textLength, textLength);
+            return;
+        }
+
+        if (end.isContentEditable) {
+            end.focus();
+            const selection = window.getSelection();
+            if (!selection) {
+                return;
+            }
+
+            const range = document.createRange();
+            if (end.childNodes && end.childNodes.length > 0) {
+                range.setStart(end, end.childNodes.length);
+            } else {
+                range.selectNodeContents(end);
+            }
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return;
+        }
+
+        if (typeof end.createTextRange === "function") {
+            const textRange = end.createTextRange();
+            textRange.collapse(true);
+            textRange.moveEnd('character', textLength);
+            textRange.moveStart('character', textLength);
+            textRange.select();
         }
     }
 
