@@ -56,7 +56,7 @@ impl PackageToggles {
         }
 
         if self.ml {
-            engine.register_global_module(MlPackage::new().as_shared_module());
+            engine.register_global_module(MLPackage::new().as_shared_module());
         }
     }
 
@@ -121,7 +121,7 @@ fn main() {
 }
 
 use rhai::packages::Package;
-use rhai_ml::MlPackage;
+use rhai_ml::MLPackage;
 use rhai_sci::SciPackage;
 
 #[tauri::command]
