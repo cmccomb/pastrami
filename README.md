@@ -33,12 +33,22 @@ the application or its test suite:
 
 ## Development workflow
 
-Run the following commands from the repository root to validate changes locally:
+The Rust backend now exposes a headless default build that keeps the heavy
+system dependencies used by Tauri optional. Run the following commands from the
+repository root to validate changes locally:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic
 cargo test
+```
+
+Enable the `desktop` feature whenever you want to lint or test code paths that
+depend on the Tauri runtime:
+
+```bash
+cargo clippy --all-targets --features desktop -- -D warnings -W clippy::pedantic
+cargo test --features desktop
 ```
 
 Documentation for the Rust components can be generated with:
@@ -60,10 +70,15 @@ prerequisites you can launch the development build with:
 
 ```bash
 npm install
-npm run tauri
+npm run tauri dev -- --features desktop
 ```
 
-This will build the frontend, compile the Rust backend, and open the desktop shell with hot-reload enabled.
+This will build the frontend, compile the Rust backend with the `desktop` feature enabled, and open the desktop shell with
+hot-reload enabled. Build artifacts for distribution can be produced with:
+
+```bash
+npm run tauri build -- --features desktop
+```
 
 ## Loading Rhai community packages
 
