@@ -6,12 +6,12 @@ navigation, and workspace details in a single interface so that exploratory data
 
 ## Prerequisites
 
-The project targets recent Linux distributions. Ensure the following tooling is available before running the application or
-its test suite:
+The project targets recent Linux distributions and macOS releases. Ensure the following tooling is available before running
+the application or its test suite:
 
 - [Rust](https://www.rust-lang.org/tools/install) toolchain (`rustup` with the `stable` toolchain is recommended)
 - `node` and `npm` for the frontend assets when building the full desktop bundle
-- System libraries required by WebKitGTK and GTK3:
+- Linux hosts require the system libraries needed by WebKitGTK and GTK3:
   ```bash
   sudo apt-get update
   sudo apt-get install -y \
@@ -22,6 +22,9 @@ its test suite:
     libsoup2.4-dev \
     patchelf
   ```
+- macOS hosts require Xcode command-line tools (for SDK headers and signing utilities) in addition to the Rust and Node.js
+  toolchains. Install the `aarch64-apple-darwin` Rust target via `rustup target add aarch64-apple-darwin` so universal bundles
+  can be produced. The Tauri bundler will also use the system `codesign` binary during `npm run tauri build`.
 
 > [!NOTE]
 > Ubuntu 24.04 currently publishes WebKitGTK 4.1. When developing on that release you may need to provide compatibility
@@ -47,7 +50,8 @@ cargo doc --no-deps
 ## Continuous integration
 
 GitHub Actions validates every commit with formatting (`cargo fmt`), linting (`cargo clippy` with pedantic warnings), and the
-Rust test suite. CI runs on `ubuntu-22.04` to match Tauri's current Linux support matrix.
+Rust test suite on `ubuntu-22.04`. A dedicated `macos-13` job installs the Rust and Node.js toolchains, builds the universal
+macOS bundle via `npm run tauri build -- --target universal-apple-darwin`, and uploads the resulting `.app` artifact.
 
 ## Running the desktop application
 
