@@ -64,3 +64,11 @@ npm run tauri
 ```
 
 This will build the frontend, compile the Rust backend, and open the desktop shell with hot-reload enabled.
+
+## Loading Rhai community packages
+
+Open the **Settings** button in the upper-right corner of the interface to load additional Rhai packages at runtime. The
+modal lists the curated [`rhaiscript`](https://github.com/orgs/rhaiscript/repositories?type=all) packages bundled with the
+application. Enable the checkboxes for [`rhai-sci`](https://github.com/rhaiscript/rhai-sci) or
+[`rhai-ml`](https://github.com/rhaiscript/rhai-ml) to register their APIs in the interactive REPL and one-off script runner
+without restarting the app. Clearing all checkboxes reverts to the base Rhai engine.
