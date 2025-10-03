@@ -28,7 +28,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt,clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -77,4 +77,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-tauri-bundle
-          path: src-tauri/target/release/bundle/macos
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/pastrami.app
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
