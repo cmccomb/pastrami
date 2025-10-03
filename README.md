@@ -23,7 +23,8 @@ the application or its test suite:
     patchelf
   ```
 - macOS hosts require Xcode command-line tools (for SDK headers and signing utilities) in addition to the Rust and Node.js
-  toolchains. The Tauri bundler will also use the system `codesign` binary during `npm run tauri build`.
+  toolchains. Install the `aarch64-apple-darwin` Rust target via `rustup target add aarch64-apple-darwin` so universal bundles
+  can be produced. The Tauri bundler will also use the system `codesign` binary during `npm run tauri build`.
 
 > [!NOTE]
 > Ubuntu 24.04 currently publishes WebKitGTK 4.1. When developing on that release you may need to provide compatibility
