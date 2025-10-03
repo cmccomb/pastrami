@@ -89,6 +89,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "rhai",
+ "rhai-ml",
  "rhai-sci",
  "serde",
  "serde_json",
@@ -3185,6 +3186,20 @@ dependencies = [
  "num-traits",
  "rhai_codegen",
  "smallvec",
+ "smartstring",
+]
+
+[[package]]
+name = "rhai-ml"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7eba35d506c40bbc178f3dd4598b9d6f34654956df53b3da4885803c9b428d7"
+dependencies = [
+ "bincode",
+ "rhai",
+ "serde",
+ "serde_json",
+ "smartcore",
  "smartstring",
 ]
 

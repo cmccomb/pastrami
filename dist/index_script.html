@@ -50,14 +50,22 @@
 </div>
 <script>
     // access the pre-bundled global API functions
-    const invoke = window.__TAURI__.invoke
+    const tauriApi = window.__TAURI__ || {};
+    const invoke = typeof tauriApi.invoke === 'function'
+        ? tauriApi.invoke.bind(tauriApi)
+        : async () => {
+            throw new Error('Tauri API not available');
+        };
 
     toggle_spinner();
     append_output('Welcome to pastrami on rhai!');
 
     function run_script() {
         toggle_spinner();
-        invoke('rhai_script', {script: document.getElementById("script").value});
+        invoke('rhai_script', {script: document.getElementById("script").value}).catch((error) => {
+            append_output(`#Failed to run script: ${error}`);
+            toggle_spinner();
+        });
     }
 
     function append_output(s) {
