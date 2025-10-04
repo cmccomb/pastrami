@@ -16,8 +16,11 @@ tauri-build = { version = "1.0.4", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.0.5", features = ["api-all"] }
-rhai-sci = { version = "0.1.9", features = ["smartcore", "nalgebra", "rand", "io"] }
+rhai-sci = { version = "0.1.9", default-features = false, features = ["nalgebra", "rand", "smartcore"] }
 rhai-ml = "0.1.2"
+rhai-fs = { version = "0.1.3", features = ["sync"] }
+rhai-url = "0.0.5"
+rhai-rand = "0.1.6"
 rhai = { version = "1.9.0", features= ["sync"] }
 
 [features]
