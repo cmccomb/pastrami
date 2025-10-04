@@ -2,6 +2,7 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -39,6 +40,9 @@ fn send_output(window: &tauri::Window, message: &str) {
 struct PackageToggles {
     sci: bool,
     ml: bool,
+    fs: bool,
+    url: bool,
+    rand: bool,
 }
 
 impl Default for PackageToggles {
@@ -46,6 +50,9 @@ impl Default for PackageToggles {
         Self {
             sci: true,
             ml: false,
+            fs: false,
+            url: false,
+            rand: false,
         }
     }
 }
@@ -59,6 +66,18 @@ impl PackageToggles {
         if self.ml {
             engine.register_global_module(MLPackage::new().as_shared_module());
         }
+
+        if self.fs {
+            engine.register_global_module(FilesystemPackage::new().as_shared_module());
+        }
+
+        if self.url {
+            engine.register_global_module(UrlPackage::new().as_shared_module());
+        }
+
+        if self.rand {
+            engine.register_global_module(RandomPackage::new().as_shared_module());
+        }
     }
 
     fn update_from_selection<I, S>(&mut self, selected: I)
@@ -66,13 +85,16 @@ impl PackageToggles {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let normalized: Vec<String> = selected
+        let normalized: HashSet<String> = selected
             .into_iter()
             .map(|name| name.as_ref().trim().to_lowercase())
             .collect();
 
-        self.sci = normalized.iter().any(|name| name == "rhai-sci");
-        self.ml = normalized.iter().any(|name| name == "rhai-ml");
+        self.sci = normalized.contains("rhai-sci");
+        self.ml = normalized.contains("rhai-ml");
+        self.fs = normalized.contains("rhai-fs");
+        self.url = normalized.contains("rhai-url");
+        self.rand = normalized.contains("rhai-rand");
     }
 
     #[cfg(test)]
@@ -84,6 +106,18 @@ impl PackageToggles {
 
         if self.ml {
             packages.push("rhai-ml".to_string());
+        }
+
+        if self.fs {
+            packages.push("rhai-fs".to_string());
+        }
+
+        if self.url {
+            packages.push("rhai-url".to_string());
+        }
+
+        if self.rand {
+            packages.push("rhai-rand".to_string());
         }
 
         packages
@@ -129,8 +163,11 @@ fn main() {
 }
 
 use rhai::packages::Package;
+use rhai_fs::FilesystemPackage;
 use rhai_ml::MLPackage;
+use rhai_rand::RandomPackage;
 use rhai_sci::SciPackage;
+use rhai_url::UrlPackage;
 
 #[tauri::command]
 fn rhai_script(script: &str, window: tauri::Window) {
@@ -309,12 +346,20 @@ mod tests {
     }
 
     #[test]
-    fn package_selection_can_toggle_sci_and_ml_modules() {
+    fn package_selection_can_toggle_all_modules() {
         let mut packages = PackageToggles::default();
         assert!(packages.sci, "sci should be enabled by default");
         assert!(!packages.ml, "ml should be disabled by default");
+        assert!(!packages.fs, "fs should be disabled by default");
+        assert!(!packages.url, "url should be disabled by default");
+        assert!(!packages.rand, "rand should be disabled by default");
 
-        packages.update_from_selection(&["rhai-ml".to_string()]);
+        packages.update_from_selection(&[
+            "rhai-ml".to_string(),
+            "rhai-fs".to_string(),
+            "rhai-url".to_string(),
+            "rhai-rand".to_string(),
+        ]);
 
         assert!(
             !packages.sci,
@@ -324,8 +369,28 @@ mod tests {
             packages.ml,
             "updating selection with rhai-ml should enable the ml package"
         );
+        assert!(
+            packages.fs,
+            "updating selection with rhai-fs should enable the filesystem package"
+        );
+        assert!(
+            packages.url,
+            "updating selection with rhai-url should enable the URL package"
+        );
+        assert!(
+            packages.rand,
+            "updating selection with rhai-rand should enable the random package"
+        );
 
-        assert_eq!(packages.selected_packages(), vec!["rhai-ml".to_string()]);
+        assert_eq!(
+            packages.selected_packages(),
+            vec![
+                "rhai-ml".to_string(),
+                "rhai-fs".to_string(),
+                "rhai-url".to_string(),
+                "rhai-rand".to_string()
+            ]
+        );
     }
 }
 
@@ -355,6 +420,25 @@ fn list_available_packages(app_handle: tauri::AppHandle) -> Vec<PackageDescripto
             description: "Machine learning helpers for Rhai scripts".to_string(),
             repository: "https://github.com/rhaiscript/rhai-ml".to_string(),
             selected: selected.ml,
+        },
+        PackageDescriptor {
+            name: "rhai-fs".to_string(),
+            description: "Filesystem helpers for reading, writing, and traversing paths"
+                .to_string(),
+            repository: "https://github.com/rhaiscript/rhai-fs".to_string(),
+            selected: selected.fs,
+        },
+        PackageDescriptor {
+            name: "rhai-url".to_string(),
+            description: "Utilities for parsing and manipulating URLs".to_string(),
+            repository: "https://github.com/rhaiscript/rhai-url".to_string(),
+            selected: selected.url,
+        },
+        PackageDescriptor {
+            name: "rhai-rand".to_string(),
+            description: "Random number generation, sampling, and shuffling helpers".to_string(),
+            repository: "https://github.com/rhaiscript/rhai-rand".to_string(),
+            selected: selected.rand,
         },
     ];
 

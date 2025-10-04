@@ -131,7 +131,7 @@
     const packageSaveButton = document.getElementById("savePackageSelection");
 
     packageModal.addEventListener('show.bs.modal', async () => {
-        packageList.innerHTML = '<p class="text-muted mb-0">Loading available packages…</p>';
+        packageList.innerHTML = '<p class="text-muted mb-0">Loading bundled packages…</p>';
         try {
             const packages = await invoke('list_available_packages');
             renderPackageOptions(packages);
@@ -173,7 +173,7 @@
 
     function renderPackageOptions(packages) {
         if (!Array.isArray(packages) || packages.length === 0) {
-            packageList.innerHTML = '<p class="text-muted mb-0">No packages available.</p>';
+            packageList.innerHTML = '<p class="text-muted mb-0">No bundled packages found.</p>';
             return;
         }
 
