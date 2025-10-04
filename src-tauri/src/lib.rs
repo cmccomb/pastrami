@@ -58,10 +58,14 @@ impl PackageToggles {
     }
 
     /// Updates the toggles using a list of selected package names.
-    pub fn update_from_selection(&mut self, selected: &[String]) {
+    pub fn update_from_selection<I, S>(&mut self, selected: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
         let normalized: Vec<String> = selected
-            .iter()
-            .map(|name| name.trim().to_lowercase())
+            .into_iter()
+            .map(|name| name.as_ref().trim().to_lowercase())
             .collect();
 
         self.sci = normalized.iter().any(|name| name == "rhai-sci");

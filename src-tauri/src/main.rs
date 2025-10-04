@@ -56,7 +56,7 @@ mod desktop {
     }
 
     #[tauri::command]
-    fn rhai_script(script: &str, window: tauri::Window, state: State<MyState>) {
+    fn rhai_script(script: &str, window: tauri::Window, state: State<'_, MyState>) {
         let output_sink: OutputSink = Arc::new(move |message: String| {
             send_output(&window, &message);
         });
@@ -70,9 +70,8 @@ mod desktop {
         run_rhai_script_with_sink(script, &output_sink, &selected_packages);
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     #[tauri::command]
-    fn rhai_repl(script: &str, window: tauri::Window, state: State<MyState>) {
+    fn rhai_repl(script: &str, window: tauri::Window, state: State<'_, MyState>) {
         let mut engine = state.engine.lock().expect("engine mutex poisoned");
         let mut scope = state.scope.lock().expect("scope mutex poisoned");
         let window_for_print = window.clone();
@@ -95,7 +94,7 @@ mod desktop {
     }
 
     #[tauri::command]
-    fn list_available_packages(state: State<MyState>) -> Vec<SerializablePackageDescriptor> {
+    fn list_available_packages(state: State<'_, MyState>) -> Vec<SerializablePackageDescriptor> {
         let selected = state
             .packages
             .lock()
@@ -132,11 +131,11 @@ mod desktop {
     }
 
     #[tauri::command]
-    fn update_packages(selected: Vec<String>, state: State<MyState>) {
+    fn update_packages(selected: Vec<String>, state: State<'_, MyState>) {
         let mut package_state = state.packages.lock().expect("package mutex poisoned");
 
         let mut new_selection = package_state.clone();
-        new_selection.update_from_selection(&selected);
+        new_selection.update_from_selection(selected);
 
         if *package_state == new_selection {
             return;
