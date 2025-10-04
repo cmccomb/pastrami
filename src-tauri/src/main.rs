@@ -5,6 +5,7 @@
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
+use tauri::Manager;
 
 /// Builds a JavaScript snippet that safely forwards a message to the frontend.
 ///
@@ -60,16 +61,21 @@ impl PackageToggles {
         }
     }
 
-    fn update_from_selection(&mut self, selected: &[String]) {
+    fn update_from_selection<I, S>(&mut self, selected: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
         let normalized: Vec<String> = selected
-            .iter()
-            .map(|name| name.trim().to_lowercase())
+            .into_iter()
+            .map(|name| name.as_ref().trim().to_lowercase())
             .collect();
 
         self.sci = normalized.iter().any(|name| name == "rhai-sci");
         self.ml = normalized.iter().any(|name| name == "rhai-ml");
     }
 
+    #[cfg(test)]
     fn selected_packages(&self) -> Vec<String> {
         let mut packages = Vec::new();
         if self.sci {
@@ -104,6 +110,12 @@ fn main() {
     packages.apply_to_engine(&mut engine);
     let scope = rhai::Scope::new();
 
+    let app_state = Arc::new(MyState {
+        engine: Mutex::new(engine),
+        scope: Mutex::new(scope),
+        packages: Mutex::new(packages),
+    });
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             rhai_repl,
@@ -111,11 +123,7 @@ fn main() {
             list_available_packages,
             update_packages
         ])
-        .manage(MyState {
-            engine: Mutex::new(engine),
-            scope: Mutex::new(scope),
-            packages: Mutex::new(packages),
-        })
+        .manage(app_state)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -125,33 +133,46 @@ use rhai_ml::MLPackage;
 use rhai_sci::SciPackage;
 
 #[tauri::command]
-fn rhai_script(script: &str, window: tauri::Window, state: tauri::State<MyState>) {
-    let output_sink: OutputSink = Arc::new(move |message: String| {
-        send_output(&window, &message);
-    });
+fn rhai_script(script: &str, window: tauri::Window) {
+    let app_state = {
+        let state = window.state::<Arc<MyState>>();
+        Arc::clone(&state)
+    };
 
-    let selected_packages = state
+    let selected_packages = app_state
         .packages
         .lock()
         .expect("package mutex poisoned")
         .clone();
 
+    let sink_window = window;
+    let output_sink: OutputSink = Arc::new(move |message: String| {
+        send_output(&sink_window, &message);
+    });
+
     run_rhai_script_with_sink(script, &output_sink, &selected_packages);
 }
 
-#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
-fn rhai_repl(script: &str, window: tauri::Window, state: tauri::State<MyState>) {
-    let mut engine = state.engine.lock().unwrap();
-    let mut scope = state.scope.lock().unwrap();
-    let window_for_print = window.clone();
+fn rhai_repl(script: &str, window: tauri::Window) {
+    let app_state = {
+        let app_handle = window.app_handle();
+        let state = app_handle.state::<Arc<MyState>>();
+        Arc::clone(&state)
+    };
+
+    let mut engine = app_state.engine.lock().unwrap();
+    let mut scope = app_state.scope.lock().unwrap();
+
+    let evaluation_window = window.clone();
+    let print_window = window;
     engine.on_print(move |message| {
-        send_output(&window_for_print, message);
+        send_output(&print_window, message);
     });
 
     match engine.eval_with_scope::<rhai::Dynamic>(&mut scope, script) {
-        Ok(result) => send_output(&window, &result.to_string()),
-        Err(e) => send_output(&window, &format!("{e:?}")),
+        Ok(result) => send_output(&evaluation_window, &result.to_string()),
+        Err(e) => send_output(&evaluation_window, &format!("{e:?}")),
     }
 }
 
@@ -200,7 +221,7 @@ mod tests {
     use super::{append_output_script, run_rhai_script_with_sink, OutputSink, PackageToggles};
     use std::sync::{Arc, Mutex};
 
-    fn run_script_with_collector(script: &str, packages: PackageToggles) -> Vec<String> {
+    fn run_script_with_collector(script: &str, packages: &PackageToggles) -> Vec<String> {
         let captured_output: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let sink_target = Arc::clone(&captured_output);
         let sink: OutputSink = Arc::new(move |message: String| {
@@ -210,7 +231,7 @@ mod tests {
                 .push(message);
         });
 
-        run_rhai_script_with_sink(script, &sink, &packages);
+        run_rhai_script_with_sink(script, &sink, packages);
 
         let collected = captured_output
             .lock()
@@ -236,7 +257,7 @@ mod tests {
 
     #[test]
     fn invalid_script_reports_parse_error() {
-        let output = run_script_with_collector("let x = ;", PackageToggles::default());
+        let output = run_script_with_collector("let x = ;", &PackageToggles::default());
         let last_message = output
             .last()
             .expect("missing output entry for invalid script");
@@ -249,7 +270,7 @@ mod tests {
 
     #[test]
     fn valid_script_reports_result() {
-        let output = run_script_with_collector("40 + 2", PackageToggles::default());
+        let output = run_script_with_collector("40 + 2", &PackageToggles::default());
         assert!(
             output.contains(&"42".to_string()),
             "expected valid script to produce \"42\" but saw {output:?}",
@@ -263,7 +284,7 @@ mod tests {
             fn explode() { throw("boom"); }
             explode();
             "#,
-            PackageToggles::default(),
+            &PackageToggles::default(),
         );
 
         let last_message = output
@@ -278,7 +299,7 @@ mod tests {
     #[test]
     fn print_statements_are_captured_before_results() {
         let output =
-            run_script_with_collector(r#"print("hi"); 41 + 1;"#, PackageToggles::default());
+            run_script_with_collector(r#"print("hi"); 41 + 1;"#, &PackageToggles::default());
 
         assert_eq!(
             output,
@@ -309,14 +330,19 @@ mod tests {
 }
 
 #[tauri::command]
-fn list_available_packages(state: tauri::State<MyState>) -> Vec<PackageDescriptor> {
-    let selected = state
+fn list_available_packages(app_handle: tauri::AppHandle) -> Vec<PackageDescriptor> {
+    let app_state = {
+        let state = app_handle.state::<Arc<MyState>>();
+        Arc::clone(&state)
+    };
+
+    let selected = app_state
         .packages
         .lock()
         .expect("package mutex poisoned")
         .clone();
 
-    vec![
+    let packages = vec![
         PackageDescriptor {
             name: "rhai-sci".to_string(),
             description: "Scientific and numerical utilities built on smartcore and nalgebra"
@@ -330,15 +356,23 @@ fn list_available_packages(state: tauri::State<MyState>) -> Vec<PackageDescripto
             repository: "https://github.com/rhaiscript/rhai-ml".to_string(),
             selected: selected.ml,
         },
-    ]
+    ];
+
+    let _consumed_handle = app_handle;
+    packages
 }
 
 #[tauri::command]
-fn update_packages(selected: Vec<String>, state: tauri::State<MyState>) {
-    let mut package_state = state.packages.lock().expect("package mutex poisoned");
+fn update_packages(selected: Vec<String>, app_handle: tauri::AppHandle) {
+    let app_state = {
+        let state = app_handle.state::<Arc<MyState>>();
+        Arc::clone(&state)
+    };
+
+    let mut package_state = app_state.packages.lock().expect("package mutex poisoned");
 
     let mut new_selection = package_state.clone();
-    new_selection.update_from_selection(&selected);
+    new_selection.update_from_selection(selected);
 
     if *package_state == new_selection {
         return;
@@ -346,13 +380,15 @@ fn update_packages(selected: Vec<String>, state: tauri::State<MyState>) {
 
     *package_state = new_selection.clone();
 
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = app_state.engine.lock().unwrap();
     *engine = {
         let mut refreshed = rhai::Engine::new();
         new_selection.apply_to_engine(&mut refreshed);
         refreshed
     };
 
-    let mut scope = state.scope.lock().unwrap();
+    let mut scope = app_state.scope.lock().unwrap();
     *scope = rhai::Scope::new();
+
+    let _consumed_handle = app_handle;
 }
