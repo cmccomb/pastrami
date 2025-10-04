@@ -2,10 +2,14 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use serde::Serialize;
+use rhai::packages::Package;
+use rhai_fs::FilesystemPackage;
+use rhai_ml::MLPackage;
+use rhai_rand::RandomPackage;
+use rhai_sci::SciPackage;
+use rhai_url::UrlPackage;
 use tauri::Manager;
 
 /// Builds a JavaScript snippet that safely forwards a message to the frontend.
@@ -36,138 +40,67 @@ fn send_output(window: &tauri::Window, message: &str) {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct PackageToggles {
-    sci: bool,
-    ml: bool,
-    fs: bool,
-    url: bool,
-    rand: bool,
+type SharedModule = rhai::Shared<rhai::Module>;
+
+fn flatten_package_module<P>(package: P) -> SharedModule
+where
+    P: Package,
+{
+    let shared = package.as_shared_module();
+    let mut module = rhai::Module::new();
+    module.combine_flatten((*shared).clone());
+    module.into()
 }
 
-impl Default for PackageToggles {
-    fn default() -> Self {
-        Self {
-            sci: true,
-            ml: false,
-            fs: false,
-            url: false,
-            rand: false,
-        }
-    }
+fn build_rand_module() -> SharedModule {
+    flatten_package_module(RandomPackage::new())
 }
 
-impl PackageToggles {
-    fn apply_to_engine(&self, engine: &mut rhai::Engine) {
-        if self.sci {
-            engine.register_global_module(SciPackage::new().as_shared_module());
-        }
-
-        if self.ml {
-            engine.register_global_module(MLPackage::new().as_shared_module());
-        }
-
-        if self.fs {
-            engine.register_global_module(FilesystemPackage::new().as_shared_module());
-        }
-
-        if self.url {
-            engine.register_global_module(UrlPackage::new().as_shared_module());
-        }
-
-        if self.rand {
-            engine.register_global_module(RandomPackage::new().as_shared_module());
-        }
-    }
-
-    fn update_from_selection<I, S>(&mut self, selected: I)
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<str>,
-    {
-        let normalized: HashSet<String> = selected
-            .into_iter()
-            .map(|name| name.as_ref().trim().to_lowercase())
-            .collect();
-
-        self.sci = normalized.contains("rhai-sci");
-        self.ml = normalized.contains("rhai-ml");
-        self.fs = normalized.contains("rhai-fs");
-        self.url = normalized.contains("rhai-url");
-        self.rand = normalized.contains("rhai-rand");
-    }
-
-    #[cfg(test)]
-    fn selected_packages(&self) -> Vec<String> {
-        let mut packages = Vec::new();
-        if self.sci {
-            packages.push("rhai-sci".to_string());
-        }
-
-        if self.ml {
-            packages.push("rhai-ml".to_string());
-        }
-
-        if self.fs {
-            packages.push("rhai-fs".to_string());
-        }
-
-        if self.url {
-            packages.push("rhai-url".to_string());
-        }
-
-        if self.rand {
-            packages.push("rhai-rand".to_string());
-        }
-
-        packages
-    }
+fn build_fs_module() -> SharedModule {
+    flatten_package_module(FilesystemPackage::new())
 }
 
-#[derive(Serialize)]
-struct PackageDescriptor {
-    name: String,
-    description: String,
-    repository: String,
-    selected: bool,
+fn build_url_module() -> SharedModule {
+    flatten_package_module(UrlPackage::new())
+}
+
+fn build_ml_module() -> SharedModule {
+    flatten_package_module(MLPackage::new())
+}
+
+fn build_sci_module() -> SharedModule {
+    flatten_package_module(SciPackage::new())
+}
+
+fn configure_engine(mut engine: rhai::Engine) -> rhai::Engine {
+    engine.register_static_module("rand", build_rand_module());
+    engine.register_static_module("fs", build_fs_module());
+    engine.register_static_module("url", build_url_module());
+    engine.register_static_module("ml", build_ml_module());
+    engine.register_static_module("sci", build_sci_module());
+    engine
 }
 
 struct MyState {
     engine: Mutex<rhai::Engine>,
     scope: Mutex<rhai::Scope<'static>>,
-    packages: Mutex<PackageToggles>,
 }
 
 fn main() {
-    let packages = PackageToggles::default();
-    let mut engine = rhai::Engine::new();
-    packages.apply_to_engine(&mut engine);
+    let engine = configure_engine(rhai::Engine::new());
     let scope = rhai::Scope::new();
 
     let app_state = Arc::new(MyState {
         engine: Mutex::new(engine),
         scope: Mutex::new(scope),
-        packages: Mutex::new(packages),
     });
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
-            rhai_repl,
-            rhai_script,
-            list_available_packages,
-            update_packages
-        ])
+        .invoke_handler(tauri::generate_handler![rhai_repl, rhai_script])
         .manage(app_state)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
-use rhai::packages::Package;
-use rhai_fs::FilesystemPackage;
-use rhai_ml::MLPackage;
-use rhai_rand::RandomPackage;
-use rhai_sci::SciPackage;
-use rhai_url::UrlPackage;
 
 #[tauri::command]
 fn rhai_script(script: &str, window: tauri::Window) {
@@ -176,18 +109,12 @@ fn rhai_script(script: &str, window: tauri::Window) {
         Arc::clone(&state)
     };
 
-    let selected_packages = app_state
-        .packages
-        .lock()
-        .expect("package mutex poisoned")
-        .clone();
-
     let sink_window = window;
     let output_sink: OutputSink = Arc::new(move |message: String| {
         send_output(&sink_window, &message);
     });
 
-    run_rhai_script_with_sink(script, &output_sink, &selected_packages);
+    run_rhai_script_with_sink(script, &output_sink);
 }
 
 #[tauri::command]
@@ -235,9 +162,8 @@ type OutputSink = Arc<dyn Fn(String) + Send + Sync + 'static>;
 /// run_rhai_script_with_sink("40 + 2", &sink);
 /// assert_eq!(output.lock().unwrap().as_slice(), ["42"]);
 /// ```
-fn run_rhai_script_with_sink(script: &str, sink: &OutputSink, packages: &PackageToggles) {
-    let mut engine = rhai::Engine::new();
-    packages.apply_to_engine(&mut engine);
+fn run_rhai_script_with_sink(script: &str, sink: &OutputSink) {
+    let mut engine = configure_engine(rhai::Engine::new());
 
     let print_sink = Arc::clone(sink);
     engine.on_print(move |x| {
@@ -255,10 +181,10 @@ fn run_rhai_script_with_sink(script: &str, sink: &OutputSink, packages: &Package
 
 #[cfg(test)]
 mod tests {
-    use super::{append_output_script, run_rhai_script_with_sink, OutputSink, PackageToggles};
+    use super::{append_output_script, run_rhai_script_with_sink, OutputSink};
     use std::sync::{Arc, Mutex};
 
-    fn run_script_with_collector(script: &str, packages: &PackageToggles) -> Vec<String> {
+    fn run_script_with_collector(script: &str) -> Vec<String> {
         let captured_output: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let sink_target = Arc::clone(&captured_output);
         let sink: OutputSink = Arc::new(move |message: String| {
@@ -268,7 +194,7 @@ mod tests {
                 .push(message);
         });
 
-        run_rhai_script_with_sink(script, &sink, packages);
+        run_rhai_script_with_sink(script, &sink);
 
         let collected = captured_output
             .lock()
@@ -294,7 +220,7 @@ mod tests {
 
     #[test]
     fn invalid_script_reports_parse_error() {
-        let output = run_script_with_collector("let x = ;", &PackageToggles::default());
+        let output = run_script_with_collector("let x = ;");
         let last_message = output
             .last()
             .expect("missing output entry for invalid script");
@@ -307,7 +233,7 @@ mod tests {
 
     #[test]
     fn valid_script_reports_result() {
-        let output = run_script_with_collector("40 + 2", &PackageToggles::default());
+        let output = run_script_with_collector("40 + 2");
         assert!(
             output.contains(&"42".to_string()),
             "expected valid script to produce \"42\" but saw {output:?}",
@@ -321,7 +247,6 @@ mod tests {
             fn explode() { throw("boom"); }
             explode();
             "#,
-            &PackageToggles::default(),
         );
 
         let last_message = output
@@ -335,9 +260,7 @@ mod tests {
 
     #[test]
     fn print_statements_are_captured_before_results() {
-        let output =
-            run_script_with_collector(r#"print("hi"); 41 + 1;"#, &PackageToggles::default());
-
+        let output = run_script_with_collector(r#"print("hi"); 41 + 1;"#);
         assert_eq!(
             output,
             vec!["hi".to_string(), "42".to_string()],
@@ -346,133 +269,21 @@ mod tests {
     }
 
     #[test]
-    fn package_selection_can_toggle_all_modules() {
-        let mut packages = PackageToggles::default();
-        assert!(packages.sci, "sci should be enabled by default");
-        assert!(!packages.ml, "ml should be disabled by default");
-        assert!(!packages.fs, "fs should be disabled by default");
-        assert!(!packages.url, "url should be disabled by default");
-        assert!(!packages.rand, "rand should be disabled by default");
+    fn bundled_modules_are_available_under_namespaces() {
+        let output = run_script_with_collector(
+            r#"
+            let value = rand::rand(0, 10);
+            value >= 0 && value <= 10
+            "#,
+        );
 
-        packages.update_from_selection(&[
-            "rhai-ml".to_string(),
-            "rhai-fs".to_string(),
-            "rhai-url".to_string(),
-            "rhai-rand".to_string(),
-        ]);
-
-        assert!(
-            !packages.sci,
-            "updating selection without rhai-sci should disable the sci package"
-        );
-        assert!(
-            packages.ml,
-            "updating selection with rhai-ml should enable the ml package"
-        );
-        assert!(
-            packages.fs,
-            "updating selection with rhai-fs should enable the filesystem package"
-        );
-        assert!(
-            packages.url,
-            "updating selection with rhai-url should enable the URL package"
-        );
-        assert!(
-            packages.rand,
-            "updating selection with rhai-rand should enable the random package"
-        );
+        let last_message = output
+            .last()
+            .expect("missing output entry for bundled module test");
 
         assert_eq!(
-            packages.selected_packages(),
-            vec![
-                "rhai-ml".to_string(),
-                "rhai-fs".to_string(),
-                "rhai-url".to_string(),
-                "rhai-rand".to_string()
-            ]
+            last_message, "true",
+            "expected namespace-qualified module call to succeed"
         );
     }
-}
-
-#[tauri::command]
-fn list_available_packages(app_handle: tauri::AppHandle) -> Vec<PackageDescriptor> {
-    let app_state = {
-        let state = app_handle.state::<Arc<MyState>>();
-        Arc::clone(&state)
-    };
-
-    let selected = app_state
-        .packages
-        .lock()
-        .expect("package mutex poisoned")
-        .clone();
-
-    let packages = vec![
-        PackageDescriptor {
-            name: "rhai-sci".to_string(),
-            description: "Scientific and numerical utilities built on smartcore and nalgebra"
-                .to_string(),
-            repository: "https://github.com/rhaiscript/rhai-sci".to_string(),
-            selected: selected.sci,
-        },
-        PackageDescriptor {
-            name: "rhai-ml".to_string(),
-            description: "Machine learning helpers for Rhai scripts".to_string(),
-            repository: "https://github.com/rhaiscript/rhai-ml".to_string(),
-            selected: selected.ml,
-        },
-        PackageDescriptor {
-            name: "rhai-fs".to_string(),
-            description: "Filesystem helpers for reading, writing, and traversing paths"
-                .to_string(),
-            repository: "https://github.com/rhaiscript/rhai-fs".to_string(),
-            selected: selected.fs,
-        },
-        PackageDescriptor {
-            name: "rhai-url".to_string(),
-            description: "Utilities for parsing and manipulating URLs".to_string(),
-            repository: "https://github.com/rhaiscript/rhai-url".to_string(),
-            selected: selected.url,
-        },
-        PackageDescriptor {
-            name: "rhai-rand".to_string(),
-            description: "Random number generation, sampling, and shuffling helpers".to_string(),
-            repository: "https://github.com/rhaiscript/rhai-rand".to_string(),
-            selected: selected.rand,
-        },
-    ];
-
-    let _consumed_handle = app_handle;
-    packages
-}
-
-#[tauri::command]
-fn update_packages(selected: Vec<String>, app_handle: tauri::AppHandle) {
-    let app_state = {
-        let state = app_handle.state::<Arc<MyState>>();
-        Arc::clone(&state)
-    };
-
-    let mut package_state = app_state.packages.lock().expect("package mutex poisoned");
-
-    let mut new_selection = package_state.clone();
-    new_selection.update_from_selection(selected);
-
-    if *package_state == new_selection {
-        return;
-    }
-
-    *package_state = new_selection.clone();
-
-    let mut engine = app_state.engine.lock().unwrap();
-    *engine = {
-        let mut refreshed = rhai::Engine::new();
-        new_selection.apply_to_engine(&mut refreshed);
-        refreshed
-    };
-
-    let mut scope = app_state.scope.lock().unwrap();
-    *scope = rhai::Scope::new();
-
-    let _consumed_handle = app_handle;
 }

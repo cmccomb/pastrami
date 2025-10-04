@@ -13,11 +13,6 @@
     </style>
 </head>
 <body style="background-color: black">
-<div class="position-absolute" style="right: 1rem; top: 1rem; z-index: 1030;">
-    <button type="button" class="btn btn-outline-light btn-sm" data-toggle="modal" data-target="#settingsModal">
-        Settings
-    </button>
-</div>
 <div class="container-fluid h-100 min-vh-100 p-0">
     <div class="row w-100 m-0" id="output_holder" >
         <div class="col h-100 min-vh-100 "style="background-color: #2B2B2B;">
@@ -27,30 +22,6 @@
                   style="white-space: pre-wrap; line-height: 25px;">&gt;&gt;&gt; </code>
             <code id="repl_input" class="text-warning d-inline pb-0 w-100"
                   style="min-height: 1em; white-space: pre-wrap; min-width: 3em; margin-left: -4px; line-height: 25px;" contenteditable></code>
-        </div>
-    </div>
-</div>
-<div class="modal fade" id="settingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalTitle"
-     aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable" role="document">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="settingsModalTitle">Rhai Packages</h5>
-                <button type="button" class="close text-light" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="packageList">
-                <p class="text-muted mb-0">Loading available packages…</p>
-            </div>
-            <div class="modal-footer border-secondary">
-                <a class="mr-auto text-info" href="https://github.com/orgs/rhaiscript/repositories?type=all"
-                   target="_blank" rel="noreferrer noopener">
-                    Explore Rhai community packages
-                </a>
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="savePackageSelection">Load Packages</button>
-            </div>
         </div>
     </div>
 </div>
@@ -124,75 +95,6 @@
             textRange.moveStart('character', textLength);
             textRange.select();
         }
-    }
-
-    const packageModal = document.getElementById("settingsModal");
-    const packageList = document.getElementById("packageList");
-    const packageSaveButton = document.getElementById("savePackageSelection");
-
-    packageModal.addEventListener('show.bs.modal', async () => {
-        packageList.innerHTML = '<p class="text-muted mb-0">Loading bundled packages…</p>';
-        try {
-            const packages = await invoke('list_available_packages');
-            renderPackageOptions(packages);
-        } catch (error) {
-            packageList.innerHTML = '';
-            append_output(`#Failed to load packages: ${error}`);
-        }
-    });
-
-    packageSaveButton.addEventListener('click', async () => {
-        const selected = Array.from(
-            packageList.querySelectorAll('input.package-checkbox:checked')
-        ).map((checkbox) => checkbox.value);
-
-        try {
-            await invoke('update_packages', {selected});
-            const summary = selected.length > 0 ? selected.join(', ') : 'none';
-            append_output(`Loaded packages: ${summary}`);
-            if (window.jQuery) {
-                window.jQuery(packageModal).modal('hide');
-            }
-        } catch (error) {
-            append_output(`#Failed to update packages: ${error}`);
-        }
-    });
-
-    function escapeHtml(value) {
-        if (typeof value !== 'string') {
-            return '';
-        }
-
-        return value
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function renderPackageOptions(packages) {
-        if (!Array.isArray(packages) || packages.length === 0) {
-            packageList.innerHTML = '<p class="text-muted mb-0">No bundled packages found.</p>';
-            return;
-        }
-
-        packageList.innerHTML = packages.map((pkg) => {
-            const checked = pkg.selected ? 'checked' : '';
-            const safeName = escapeHtml(pkg.name);
-            const safeDescription = escapeHtml(pkg.description);
-            const safeRepository = escapeHtml(pkg.repository);
-            return `
-                <div class="custom-control custom-checkbox mb-3">
-                    <input type="checkbox" class="custom-control-input package-checkbox" id="pkg-${safeName}" value="${safeName}" ${checked}>
-                    <label class="custom-control-label" for="pkg-${safeName}">
-                        <strong>${safeName}</strong>
-                        <span class="d-block text-muted small">${safeDescription}</span>
-                        <a class="text-info" href="${safeRepository}" target="_blank" rel="noreferrer noopener">${safeRepository}</a>
-                    </label>
-                </div>
-            `;
-        }).join('');
     }
 
     function append_output(payload) {

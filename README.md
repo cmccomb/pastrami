@@ -65,17 +65,17 @@ npm run tauri
 
 This will build the frontend, compile the Rust backend, and open the desktop shell with hot-reload enabled.
 
-## Loading Rhai community packages
+## Bundled Rhai packages
 
-Open the **Settings** button in the upper-right corner of the interface to load additional Rhai packages at runtime. The
-modal lists the curated [`rhaiscript`](https://github.com/orgs/rhaiscript/repositories?type=all) packages bundled with the
-application:
+Pastrami preloads the curated [`rhaiscript`](https://github.com/orgs/rhaiscript/repositories?type=all) packages directly
+into the Rhai engine so their APIs are always available without visiting a settings modal. Each package is exposed through
+its own namespace to avoid polluting the global scope:
 
-- [`rhai-sci`](https://github.com/rhaiscript/rhai-sci) — scientific and numerical helpers
-- [`rhai-ml`](https://github.com/rhaiscript/rhai-ml) — machine learning helpers
-- [`rhai-fs`](https://github.com/rhaiscript/rhai-fs) — filesystem access helpers
-- [`rhai-url`](https://github.com/rhaiscript/rhai-url) — URL parsing and manipulation helpers
-- [`rhai-rand`](https://github.com/rhaiscript/rhai-rand) — random number generation helpers
+- [`sci`](https://github.com/rhaiscript/rhai-sci) wraps the scientific helpers from `rhai-sci`
+- [`ml`](https://github.com/rhaiscript/rhai-ml) provides machine learning utilities from `rhai-ml`
+- [`fs`](https://github.com/rhaiscript/rhai-fs) offers filesystem helpers from `rhai-fs`
+- [`url`](https://github.com/rhaiscript/rhai-url) exposes URL parsing and manipulation helpers from `rhai-url`
+- [`rand`](https://github.com/rhaiscript/rhai-rand) supplies random number generation helpers from `rhai-rand`
 
-Enable the checkboxes for any combination of packages to register their APIs in the interactive REPL and one-off script
-runner without restarting the app. Clearing all checkboxes reverts to the base Rhai engine.
+Call functions with the namespace prefix—for example `rand::rand(0, 10)` to generate a random integer. The REPL and
+script runner share this configuration, so scripts have access to the same modules by default.
