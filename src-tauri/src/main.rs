@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-#[cfg(feature = "desktop")]
+#[cfg(feature = "custom-protocol")]
 mod desktop {
     use std::sync::{Arc, Mutex};
 
@@ -156,12 +156,12 @@ mod desktop {
     }
 }
 
-#[cfg(feature = "desktop")]
+#[cfg(feature = "custom-protocol")]
 fn main() {
     desktop::run_application();
 }
 
-#[cfg(not(feature = "desktop"))]
+#[cfg(not(feature = "custom-protocol"))]
 fn main() {
-    eprintln!("The `desktop` feature is required to run the Tauri UI.");
+    eprintln!("Enable the `desktop` (or `custom-protocol`) feature to run the Tauri UI.");
 }

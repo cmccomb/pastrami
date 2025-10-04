@@ -22,4 +22,5 @@ rhai = { version = "1.9.0", features= ["sync"] }
 
 [features]
 default = []
-desktop = ["tauri", "tauri/custom-protocol"]
+desktop = ["custom-protocol"]
+custom-protocol = ["tauri", "tauri/custom-protocol"]

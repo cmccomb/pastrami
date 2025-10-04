@@ -44,7 +44,8 @@ cargo test
 ```
 
 Enable the `desktop` feature whenever you want to lint or test code paths that
-depend on the Tauri runtime:
+depend on the Tauri runtime (the `custom-protocol` feature is an equivalent
+alias used by the Tauri bundler):
 
 ```bash
 cargo clippy --all-targets --features desktop -- -D warnings -W clippy::pedantic
@@ -73,12 +74,19 @@ npm install
 npm run tauri dev -- --features desktop
 ```
 
-This will build the frontend, compile the Rust backend with the `desktop` feature enabled, and open the desktop shell with
-hot-reload enabled. Build artifacts for distribution can be produced with:
+This will build the frontend, compile the Rust backend with the `desktop`
+feature enabled, and open the desktop shell with hot-reload enabled. Build
+artifacts for distribution can be produced with:
 
 ```bash
 npm run tauri build -- --features desktop
 ```
+
+> [!TIP]
+> The Tauri bundler enables the `custom-protocol` feature automatically. This
+> repository maps that feature to the optional Tauri dependency so CI builds and
+> local commands such as `npm run tauri build -- --target universal-apple-darwin`
+> continue to work without additional flags.
 
 ## Loading Rhai community packages
 
