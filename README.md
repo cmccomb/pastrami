@@ -66,6 +66,16 @@ npm run tauri
 
 This will build the frontend, compile the Rust backend, and open the desktop shell with hot-reload enabled.
 
+### Editor assistance
+
+The embedded REPL and script workspace now use CodeMirror with Rhai-aware autocomplete:
+
+- Press <kbd>Ctrl</kbd> + <kbd>Space</kbd> to open the completion palette at any cursor location.
+- Start typing Rhai keywords or namespace prefixes (`rand::`, `fs::`, `url::`, `ml::`, `sci::`) to receive suggestions automatically.
+- Inside the REPL, <kbd>Enter</kbd> submits the current buffer while <kbd>Shift</kbd> + <kbd>Enter</kbd> inserts a newline without executing.
+
+The static completion source covers Rhai syntax primitives alongside the namespaces that `configure_engine` makes available so that common APIs remain one shortcut away.
+
 ## Bundled Rhai packages
 
 Pastrami preloads the curated [`rhaiscript`](https://github.com/orgs/rhaiscript/repositories?type=all) packages directly
