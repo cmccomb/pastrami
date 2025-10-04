@@ -15,7 +15,7 @@ the application or its test suite:
   ```bash
   sudo apt-get update
   sudo apt-get install -y \
-    libwebkit2gtk-4.0-dev \
+    libwebkit2gtk-4.1-dev \
     libgtk-3-dev \
     libayatana-appindicator3-dev \
     librsvg2-dev \
@@ -27,9 +27,10 @@ the application or its test suite:
   can be produced. The Tauri bundler will also use the system `codesign` binary during `npm run tauri build`.
 
 > [!NOTE]
-> Ubuntu 24.04 currently publishes WebKitGTK 4.1. When developing on that release you may need to provide compatibility
-> symlinks (`libwebkit2gtk-4.0.so`, `libjavascriptcoregtk-4.0.so`, and their corresponding `.pc` files) that forward to the
-> installed 4.1 libraries so that older Tauri versions link successfully.
+> Ubuntu 24.04 publishes WebKitGTK 4.1. The bundled Tauri backend links against the same version, so the development
+> dependencies above install `libwebkit2gtk-4.1-dev` and `libjavascriptcoregtk-4.1-dev`. If you are building on an older
+> distribution that only ships WebKitGTK 4.0 you can still compile the application, but cross-version builds are not
+> supported.
 
 ## Development workflow
 
@@ -71,7 +72,8 @@ Pastrami preloads the curated [`rhaiscript`](https://github.com/orgs/rhaiscript/
 into the Rhai engine so their APIs are always available without visiting a settings modal. Each package is exposed through
 its own namespace to avoid polluting the global scope:
 
-- [`sci`](https://github.com/rhaiscript/rhai-sci) wraps the scientific helpers from `rhai-sci`
+- [`sci`](https://github.com/rhaiscript/rhai-sci) wraps the scientific helpers from `rhai-sci` (matrix algebra, statistics,
+  and modelling powered by the `nalgebra`, `smartcore`, and `rand` feature set)
 - [`ml`](https://github.com/rhaiscript/rhai-ml) provides machine learning utilities from `rhai-ml`
 - [`fs`](https://github.com/rhaiscript/rhai-fs) offers filesystem helpers from `rhai-fs`
 - [`url`](https://github.com/rhaiscript/rhai-url) exposes URL parsing and manipulation helpers from `rhai-url`
@@ -79,3 +81,7 @@ its own namespace to avoid polluting the global scope:
 
 Call functions with the namespace prefix—for example `rand::rand(0, 10)` to generate a random integer. The REPL and
 script runner share this configuration, so scripts have access to the same modules by default.
+
+The curated scientific namespace intentionally omits the optional CSV/file helpers from `rhai-sci`'s `io` feature so the Tauri
+bundle remains portable across macOS and Linux. Combine the `sci` tools with the dedicated `fs` namespace whenever a script
+needs filesystem access.

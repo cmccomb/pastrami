@@ -4,8 +4,10 @@ use rhai::packages::Package;
 use rhai::Shared;
 use serde_json::Error as SerdeError;
 
+/// Shared module handle used to register Rhai packages with the engine.
 pub type SharedModule = Shared<rhai::Module>;
 
+/// Converts a Rhai package into a flattened module tree for registration.
 fn flatten_package_module<P>(package: &P) -> SharedModule
 where
     P: Package,
@@ -16,31 +18,51 @@ where
     module.into()
 }
 
+/// Constructs the `rand` namespace backed by `rhai-rand` helpers.
 fn build_rand_module() -> SharedModule {
     let package = rhai_rand::RandomPackage::new();
     flatten_package_module(&package)
 }
 
+/// Constructs the `fs` namespace backed by `rhai-fs` helpers.
 fn build_fs_module() -> SharedModule {
     let package = rhai_fs::FilesystemPackage::new();
     flatten_package_module(&package)
 }
 
+/// Constructs the `url` namespace backed by `rhai-url` helpers.
 fn build_url_module() -> SharedModule {
     let package = rhai_url::UrlPackage::new();
     flatten_package_module(&package)
 }
 
+/// Constructs the `ml` namespace backed by `rhai-ml` helpers.
 fn build_ml_module() -> SharedModule {
     let package = rhai_ml::MLPackage::new();
     flatten_package_module(&package)
 }
 
+/// Constructs the `sci` namespace backed by a curated `rhai-sci` configuration.
 fn build_sci_module() -> SharedModule {
     let package = rhai_sci::SciPackage::new();
     flatten_package_module(&package)
 }
 
+/// Registers all bundled namespaces on the provided engine and returns it.
+///
+/// # Examples
+///
+/// ```
+/// # use rhai::Engine;
+/// # use app::configure_engine;
+/// # fn demo() -> Result<(), Box<rhai::EvalAltResult>> {
+/// let engine = configure_engine(Engine::new());
+/// let within_bounds: bool = engine.eval("let v = rand::rand(0, 10); v >= 0 && v <= 10")?;
+/// assert!(within_bounds);
+/// # Ok(())
+/// # }
+/// # demo().unwrap();
+/// ```
 pub fn configure_engine(mut engine: rhai::Engine) -> rhai::Engine {
     engine.register_static_module("rand", build_rand_module());
     engine.register_static_module("fs", build_fs_module());
@@ -56,10 +78,34 @@ pub type OutputSink = Arc<dyn Fn(String) + Send + Sync + 'static>;
 ///
 /// # Errors
 /// Returns an error if the message cannot be serialized with `serde_json`.
+///
+/// # Examples
+///
+/// ```
+/// # use app::append_output_script;
+/// let script = append_output_script("hello")?;
+/// assert_eq!(script, "append_output(\"hello\")");
+/// # Ok::<_, serde_json::Error>(())
+/// ```
 pub fn append_output_script(message: &str) -> Result<String, SerdeError> {
     serde_json::to_string(message).map(|escaped| format!("append_output({escaped})"))
 }
 
+/// Compiles and evaluates a Rhai script, streaming output and errors into `sink`.
+///
+/// # Examples
+///
+/// ```
+/// # use std::sync::{Arc, Mutex};
+/// # use app::{run_rhai_script_with_sink, OutputSink};
+/// let captured = Arc::new(Mutex::new(Vec::new()));
+/// let sink_target = Arc::clone(&captured);
+/// let sink: OutputSink = Arc::new(move |message| {
+///     sink_target.lock().unwrap().push(message);
+/// });
+/// run_rhai_script_with_sink("41 + 1", &sink);
+/// assert_eq!(captured.lock().unwrap().last().unwrap(), "42");
+/// ```
 pub fn run_rhai_script_with_sink(script: &str, sink: &OutputSink) {
     let mut engine = configure_engine(rhai::Engine::new());
 
