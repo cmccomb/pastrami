@@ -48,6 +48,19 @@
     </div>
     <!--      </div>-->
 </div>
+<script type="module">
+    import {configureRhaiCompletions, waitForCodeMirrorEditor} from './rhai-completions.js';
+
+    const scriptElement = document.getElementById('script');
+
+    (async () => {
+        const editor = await waitForCodeMirrorEditor(scriptElement);
+        await configureRhaiCompletions(editor);
+        window.pastramiScriptEditor = editor;
+    })().catch((error) => {
+        console.error('Failed to initialise the script workspace editor', error);
+    });
+</script>
 <script>
     // access the pre-bundled global API functions
     const tauriApi = window.__TAURI__ || {};
@@ -62,7 +75,9 @@
 
     function run_script() {
         toggle_spinner();
-        invoke('rhai_script', {script: document.getElementById("script").value}).catch((error) => {
+        const editor = window.pastramiScriptEditor;
+        const script = editor ? editor.getValue() : document.getElementById("script").value;
+        invoke('rhai_script', {script}).catch((error) => {
             append_output(`#Failed to run script: ${error}`);
             toggle_spinner();
         });
