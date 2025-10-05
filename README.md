@@ -20,8 +20,11 @@ the application or its test suite:
     libayatana-appindicator3-dev \
     librsvg2-dev \
     libsoup2.4-dev \
+    libglib2.0-dev \
     patchelf
   ```
+  The `glib-2.0` development headers are necessary for crates that depend on `glib-sys`, including the GTK bindings pulled in
+  by Tauri's windowing layer.
 - macOS hosts require Xcode command-line tools (for SDK headers and signing utilities) in addition to the Rust and Node.js
   toolchains. Install the `aarch64-apple-darwin` Rust target via `rustup target add aarch64-apple-darwin` so universal bundles
   can be produced. The Tauri bundler will also use the system `codesign` binary during `npm run tauri build`.
@@ -30,7 +33,13 @@ the application or its test suite:
 > Ubuntu 24.04 publishes WebKitGTK 4.1. The bundled Tauri backend links against the same version, so the development
 > dependencies above install `libwebkit2gtk-4.1-dev` and `libjavascriptcoregtk-4.1-dev`. If you are building on an older
 > distribution that only ships WebKitGTK 4.0 you can still compile the application, but cross-version builds are not
-> supported.
+> supported. Should your linker complain about missing `libwebkit2gtk-4.0.so` or `libjavascriptcoregtk-4.0.so`, create
+> compatibility symlinks that point to the 4.1 versions, for example:
+> ```bash
+> sudo ln -sf /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
+> sudo ln -sf /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
+> ```
+> This mirrors the workaround we apply in CI so `cargo clippy` and `cargo test` can link successfully against WebKitGTK.
 
 ## Development workflow
 
