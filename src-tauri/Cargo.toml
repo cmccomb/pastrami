@@ -21,7 +21,7 @@ rhai-ml = "0.1.2"
 rhai-fs = { version = "0.1.3", features = ["sync"] }
 rhai-url = "0.0.5"
 rhai-rand = "0.1.6"
-rhai = { version = "1.9.0", features= ["sync"] }
+rhai = { version = "=1.23.3", features = ["sync", "internals"] }
 
 [features]
 # by default Tauri runs in production mode
