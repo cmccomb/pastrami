@@ -37,7 +37,77 @@ const RHAI_NAMESPACE_COMPLETIONS = RHAI_NAMESPACES.reduce((accumulator, namespac
     accumulator.push(namespace, `${namespace}::`);
     return accumulator;
 }, []);
-const COMPLETIONS = [...new Set([...RHAI_KEYWORDS, ...RHAI_NAMESPACE_COMPLETIONS])].sort();
+const FALLBACK_COMPLETIONS = [
+    ...new Set([...RHAI_KEYWORDS, ...RHAI_NAMESPACE_COMPLETIONS])
+].sort();
+
+const tauriApi = window.__TAURI__ || {};
+const invoke = typeof tauriApi.invoke === 'function' ? tauriApi.invoke.bind(tauriApi) : null;
+
+let completionEntries = [...FALLBACK_COMPLETIONS];
+let completionCatalogPromise = null;
+
+async function ensureCompletionCatalogLoaded() {
+    if (!completionCatalogPromise) {
+        completionCatalogPromise = (async () => {
+            if (!invoke) {
+                return completionEntries;
+            }
+
+            try {
+                const catalog = await invoke('rhai_completion_catalog');
+                if (Array.isArray(catalog)) {
+                    const sanitized = catalog.filter(
+                        (entry) => typeof entry === 'string' && entry.trim().length > 0
+                    );
+
+                    if (sanitized.length > 0) {
+                        completionEntries = [
+                            ...new Set([...sanitized, ...RHAI_KEYWORDS])
+                        ].sort();
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load Rhai completion catalog.', error);
+            }
+
+            return completionEntries;
+        })();
+    }
+
+    return completionCatalogPromise;
+}
+
+function matchesQualifiedCandidate(candidate, query) {
+    if (!query) {
+        return true;
+    }
+
+    if (candidate.startsWith(query)) {
+        return true;
+    }
+
+    const separatorIndex = query.lastIndexOf('::');
+    if (separatorIndex === -1) {
+        return candidate.startsWith(query);
+    }
+
+    const namespacePrefix = query.slice(0, separatorIndex + 2);
+    const lastSegmentPrefix = query.slice(separatorIndex + 2);
+
+    if (!candidate.startsWith(namespacePrefix)) {
+        return false;
+    }
+
+    if (!lastSegmentPrefix) {
+        return true;
+    }
+
+    const remainder = candidate.slice(namespacePrefix.length);
+    const nextSeparator = remainder.indexOf('::');
+    const remainderSegment = nextSeparator === -1 ? remainder : remainder.slice(0, nextSeparator);
+    return remainderSegment.startsWith(lastSegmentPrefix);
+}
 
 let showHintLoadPromise = null;
 
@@ -109,8 +179,10 @@ function registerRhaiHintHelper(codeMirror) {
         const end = cursor.ch;
         const prefix = token.string.slice(0, end - start);
         const normalizedPrefix = prefix.replace(/[^A-Za-z0-9_:.]/g, '');
-        const filtered = COMPLETIONS.filter((candidate) => candidate.startsWith(normalizedPrefix));
-        const list = filtered.length > 0 ? filtered : COMPLETIONS;
+        const matches = completionEntries.filter((candidate) =>
+            matchesQualifiedCandidate(candidate, normalizedPrefix)
+        );
+        const list = matches.length > 0 ? matches : completionEntries;
         return {
             list,
             from: codeMirror.Pos(cursor.line, start),
@@ -165,6 +237,7 @@ export async function configureRhaiCompletions(editor) {
         throw new Error('configureRhaiCompletions called without an editor instance.');
     }
 
+    await ensureCompletionCatalogLoaded();
     const codeMirror = await ensureShowHintAssets();
     registerRhaiHintHelper(codeMirror);
 

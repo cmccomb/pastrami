@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use rhai::packages::Package;
@@ -46,6 +47,55 @@ fn build_ml_module() -> SharedModule {
 fn build_sci_module() -> SharedModule {
     let package = rhai_sci::SciPackage::new();
     flatten_package_module(&package)
+}
+
+fn collect_module_entries(prefix: &str, module: &rhai::Module, entries: &mut BTreeSet<String>) {
+    for (name, _) in module.iter_fn() {
+        entries.insert(format!("{prefix}::{name}"));
+    }
+
+    for (module_name, sub_module) in module.iter_sub_modules() {
+        let nested_prefix = format!("{prefix}::{module_name}");
+        entries.insert(nested_prefix.clone());
+        entries.insert(format!("{nested_prefix}::"));
+        collect_module_entries(&nested_prefix, sub_module.as_ref(), entries);
+    }
+}
+
+/// Collects completion entries for each bundled Rhai package.
+///
+/// The returned list includes namespace identifiers (for example, `rand` and
+/// `rand::`), as well as fully-qualified function and sub-module names.
+///
+/// # Examples
+///
+/// ```
+/// # use app::collect_completion_entries;
+/// let entries = collect_completion_entries();
+/// assert!(entries.iter().any(|entry| entry == "rand"));
+/// assert!(entries.iter().any(|entry| entry == "rand::"));
+/// assert!(entries
+///     .iter()
+///     .any(|entry| entry.starts_with("rand::") && entry.len() > "rand::".len()));
+/// ```
+pub fn collect_completion_entries() -> Vec<String> {
+    let mut entries: BTreeSet<String> = BTreeSet::new();
+
+    let modules = vec![
+        ("rand", build_rand_module()),
+        ("fs", build_fs_module()),
+        ("url", build_url_module()),
+        ("ml", build_ml_module()),
+        ("sci", build_sci_module()),
+    ];
+
+    for (namespace, module) in modules {
+        entries.insert(namespace.to_string());
+        entries.insert(format!("{namespace}::"));
+        collect_module_entries(namespace, module.as_ref(), &mut entries);
+    }
+
+    entries.into_iter().collect()
 }
 
 /// Registers all bundled namespaces on the provided engine and returns it.
@@ -125,7 +175,9 @@ pub fn run_rhai_script_with_sink(script: &str, sink: &OutputSink) {
 
 #[cfg(test)]
 mod tests {
-    use super::{append_output_script, run_rhai_script_with_sink, OutputSink};
+    use super::{
+        append_output_script, collect_completion_entries, run_rhai_script_with_sink, OutputSink,
+    };
     use std::sync::{Arc, Mutex};
 
     fn run_script_with_collector(script: &str) -> Vec<String> {
@@ -229,5 +281,16 @@ mod tests {
             last_message, "true",
             "expected namespace-qualified module call to succeed",
         );
+    }
+
+    #[test]
+    fn collect_completion_entries_includes_namespace_and_functions() {
+        let entries = collect_completion_entries();
+
+        assert!(entries.contains(&"rand".to_string()));
+        assert!(entries.contains(&"rand::".to_string()));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.starts_with("rand::") && entry.len() > "rand::".len()));
     }
 }

@@ -5,7 +5,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use app::{append_output_script, configure_engine, run_rhai_script_with_sink, OutputSink};
+use app::{
+    append_output_script, collect_completion_entries, configure_engine, run_rhai_script_with_sink,
+    OutputSink,
+};
 use rhai::{Dynamic, Engine, Scope};
 use tauri::Manager;
 
@@ -25,19 +28,26 @@ fn send_output(window: &tauri::Window, message: &str) {
 struct MyState {
     engine: Mutex<Engine>,
     scope: Mutex<Scope<'static>>,
+    completion_catalog: Vec<String>,
 }
 
 fn main() {
     let engine = configure_engine(Engine::new());
     let scope = Scope::new();
+    let completion_catalog = collect_completion_entries();
 
     let app_state = Arc::new(MyState {
         engine: Mutex::new(engine),
         scope: Mutex::new(scope),
+        completion_catalog,
     });
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![rhai_repl, rhai_script])
+        .invoke_handler(tauri::generate_handler![
+            rhai_completion_catalog,
+            rhai_repl,
+            rhai_script
+        ])
         .manage(app_state)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -77,4 +87,14 @@ fn rhai_repl(script: &str, window: tauri::Window) {
         Ok(result) => send_output(&evaluation_window, &result.to_string()),
         Err(e) => send_output(&evaluation_window, &format!("{e:?}")),
     }
+}
+
+#[tauri::command]
+fn rhai_completion_catalog(window: tauri::Window) -> Vec<String> {
+    let app_state = {
+        let state = window.app_handle().state::<Arc<MyState>>();
+        Arc::clone(state.inner())
+    };
+
+    app_state.completion_catalog.clone()
 }
